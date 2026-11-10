@@ -1,0 +1,163 @@
+====================================================================
+           APUNTES DE PHP - PREPARACIÓN EXAMEN (ESTILO PROCEDIMENTAL)
+====================================================================
+
+TU MANTRA VISUAL PARA EL EXAMEN:
+--------------------------------------------------------------------
+* Si el usuario manda un formulario oculto = $_POST
+* Si el dato viaja por la URL (enlaces o buscador) = $_GET
+* El motor que dispara todo = mysqli_query($conn, $sql)
+* El desarmador para leer tablas = mysqli_fetch_assoc()
+* El teletransportador = header("Location: index.php")
+
+
+====================================================================
+1. EL PUENTE: conexion.php
+(La llave maestra para que PHP hable con MySQL)
+====================================================================
+
+<?php
+// 1. Servidor, 2. Usuario, 3. Clave, 4. Base de datos
+$conn = mysqli_connect("localhost", "root", "", "mi_base");
+
+if (!$conn) {
+    die("Error al conectar: " . mysqli_connect_error());
+}
+// Si no hay error, esta hoja ya tiene a $conn lista para usarse
+?>
+
+
+====================================================================
+2. EL CUARTEL GENERAL: index.php 
+(Listar y Buscar - Todo camuflado con if/else)
+====================================================================
+
+<?php include "conexion.php"; ?>
+
+<h2>1. Agregar Cliente</h2>
+<form action="insertar.php" method="POST">
+    Cédula: <input type="text" name="cedula"><br>
+    Nombre: <input type="text" name="nombre"><br>
+    <button type="submit">Guardar</button>
+</form>
+<hr>
+
+<h2>2. Buscar y Ver Clientes</h2>
+<form method="GET" action="index.php">
+    Buscar Cédula: <input type="text" name="busqueda">
+    <button type="submit">Buscar</button>
+    <a href="index.php">Ver Todos</a>
+</form>
+
+<table border="1">
+    <tr>
+        <th>Cédula</th>
+        <th>Nombre</th>
+        <th>Acciones</th>
+    </tr>
+    <?php
+    // EL TRUCO DEL CAMUFLAJE: ¿Hay búsqueda o no?
+    if (isset($_GET['busqueda']) && $_GET['busqueda'] != "") {
+        $filtro = $_GET['busqueda'];
+        $sql = "SELECT * FROM clientes WHERE cedula = '$filtro'";
+    } else {
+        $sql = "SELECT * FROM clientes"; // Si no buscaron nada, trae todo
+    }
+
+    $resultado = mysqli_query($conn, $sql);
+
+    // DIBUJAR LA TABLA
+    while ($fila = mysqli_fetch_assoc($resultado)) {
+        echo "<tr>";
+        echo "<td>" . $fila['cedula'] . "</td>";
+        echo "<td>" . $fila['nombre'] . "</td>";
+        echo "<td>
+                <a href='editar.php?id=" . $fila['cedula'] . "'>Editar</a> | 
+                <a href='eliminar.php?id=" . $fila['cedula'] . "'>Eliminar</a>
+              </td>";
+        echo "</tr>";
+    }
+    ?>
+</table>
+
+
+====================================================================
+3. EL GUARDIÁN: insertar.php
+(Recibe, guarda y redirige al instante)
+====================================================================
+
+<?php
+include "conexion.php";
+
+// 1. Atrapar lo que manda el formulario (POST)
+$cedula = $_POST['cedula'];
+$nombre = $_POST['nombre'];
+
+// 2. Armar la consulta
+$sql = "INSERT INTO clientes (cedula, nombre) VALUES ('$cedula', '$nombre')";
+
+// 3. Ejecutarla
+mysqli_query($conn, $sql);
+
+// 4. Regresar rápido al index
+header("Location: index.php");
+?>
+
+
+====================================================================
+4. EL SICARIO: eliminar.php
+(Llegas por URL con GET, borra y te devuelve)
+====================================================================
+
+<?php
+include "conexion.php";
+
+// Atrapar la cédula que viaja por la URL (ej: eliminar.php?id=123)
+$id_borrar = $_GET['id'];
+
+$sql = "DELETE FROM clientes WHERE cedula = '$id_borrar'";
+mysqli_query($conn, $sql);
+
+header("Location: index.php");
+?>
+
+
+====================================================================
+5. EL 2 EN 1: editar.php
+(Muestra el form lleno y luego procesa el UPDATE)
+====================================================================
+
+<?php
+include "conexion.php";
+
+// PARTE 1: CUANDO LLEGAS A EDITAR (Vía GET por el enlace)
+if (isset($_GET['id'])) {
+    $id = $_GET['id'];
+    $sql = "SELECT * FROM clientes WHERE cedula = '$id'";
+    $res = mysqli_query($conn, $sql);
+    $datos = mysqli_fetch_assoc($res);
+    ?>
+    
+    <!-- Imprimimos el formulario con los datos viejos en el 'value' -->
+    <form action="editar.php" method="POST">
+        <!-- Input oculto para no perder la cédula original -->
+        <input type="hidden" name="cedula_vieja" value="<?php echo $datos['cedula']; ?>">
+        
+        Nombre: <input type="text" name="nuevo_nombre" value="<?php echo $datos['nombre']; ?>"><br>
+        <button type="submit">Actualizar</button>
+    </form>
+
+    <?php
+}
+
+// PARTE 2: CUANDO LE DAS CLICK AL BOTÓN ACTUALIZAR (Vía POST)
+if (isset($_POST['nuevo_nombre'])) {
+    $cedula_vieja = $_POST['cedula_vieja'];
+    $nuevo_nombre = $_POST['nuevo_nombre'];
+
+    $sql_update = "UPDATE clientes SET nombre = '$nuevo_nombre' WHERE cedula = '$cedula_vieja'";
+    mysqli_query($conn, $sql_update);
+
+    header("Location: index.php");
+}
+?>
