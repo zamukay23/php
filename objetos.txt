@@ -1,0 +1,161 @@
+====================================================================
+           APUNTES DE PHP - PREPARACIÓN EXAMEN (ESTILO OBJETOS ->)
+====================================================================
+
+TU MANTRA VISUAL PARA EL EXAMEN (ESTILO OBJETOS):
+--------------------------------------------------------------------
+* Para conectar = $conn = new mysqli(...)
+* Para disparar el SQL = $conn->query($sql)
+* Para leer los resultados = $resultado->fetch_assoc()
+* Para contar las filas (logins) = $resultado->num_rows
+* El teletransportador = header("Location: index.php")
+
+
+====================================================================
+1. EL PUENTE: conexion.php
+(Usamos 'new mysqli' para crear el objeto de conexión)
+====================================================================
+
+<?php
+// 1. Servidor, 2. Usuario, 3. Clave, 4. Base de datos
+$conn = new mysqli("localhost", "root", "", "mi_base");
+
+// Verificamos si el objeto reporta un error
+if ($conn->connect_error) {
+    die("Error al conectar: " . $conn->connect_error);
+}
+?>
+
+
+====================================================================
+2. EL CUARTEL GENERAL: index.php 
+(Disparamos la consulta con -> y sacamos filas con ->)
+====================================================================
+
+<?php include "conexion.php"; ?>
+
+<h2>1. Agregar Cliente</h2>
+<form action="insertar.php" method="POST">
+    Cédula: <input type="text" name="cedula"><br>
+    Nombre: <input type="text" name="nombre"><br>
+    <button type="submit">Guardar</button>
+</form>
+<hr>
+
+<h2>2. Buscar y Ver Clientes</h2>
+<form method="GET" action="index.php">
+    Buscar Cédula: <input type="text" name="busqueda">
+    <button type="submit">Buscar</button>
+    <a href="index.php">Ver Todos</a>
+</form>
+
+<table border="1">
+    <tr>
+        <th>Cédula</th>
+        <th>Nombre</th>
+        <th>Acciones</th>
+    </tr>
+    <?php
+    if (isset($_GET['busqueda']) && $_GET['busqueda'] != "") {
+        $filtro = $_GET['busqueda'];
+        $sql = "SELECT * FROM clientes WHERE cedula = '$filtro'";
+    } else {
+        $sql = "SELECT * FROM clientes"; 
+    }
+
+    // CAMBIO AQUÍ: Disparamos la flecha desde la conexión
+    $resultado = $conn->query($sql);
+
+    // CAMBIO AQUÍ: El resultado usa su propio método para desarmarse
+    while ($fila = $resultado->fetch_assoc()) {
+        echo "<tr>";
+        echo "<td>" . $fila['cedula'] . "</td>";
+        echo "<td>" . $fila['nombre'] . "</td>";
+        echo "<td>
+                <a href='editar.php?id=" . $fila['cedula'] . "'>Editar</a> | 
+                <a href='eliminar.php?id=" . $fila['cedula'] . "'>Eliminar</a>
+              </td>";
+        echo "</tr>";
+    }
+    ?>
+</table>
+
+
+====================================================================
+3. EL GUARDIÁN: insertar.php
+(Recibe, guarda con ->query y redirige al instante)
+====================================================================
+
+<?php
+include "conexion.php";
+
+$cedula = $_POST['cedula'];
+$nombre = $_POST['nombre'];
+
+$sql = "INSERT INTO clientes (cedula, nombre) VALUES ('$cedula', '$nombre')";
+
+// CAMBIO AQUÍ: Ejecutamos con la flecha
+$conn->query($sql);
+
+header("Location: index.php");
+?>
+
+
+====================================================================
+4. EL SICARIO: eliminar.php
+(Llegas por URL, borra con ->query y te devuelve)
+====================================================================
+
+<?php
+include "conexion.php";
+
+$id_borrar = $_GET['id'];
+$sql = "DELETE FROM clientes WHERE cedula = '$id_borrar'";
+
+// CAMBIO AQUÍ: Ejecutamos con la flecha
+$conn->query($sql);
+
+header("Location: index.php");
+?>
+
+
+====================================================================
+5. EL 2 EN 1: editar.php
+(Combinamos la flecha de consulta y la flecha de lectura)
+====================================================================
+
+<?php
+include "conexion.php";
+
+// PARTE 1: MOSTRAR DATOS
+if (isset($_GET['id'])) {
+    $id = $_GET['id'];
+    $sql = "SELECT * FROM clientes WHERE cedula = '$id'";
+    
+    // CAMBIO AQUÍ
+    $res = $conn->query($sql);
+    $datos = $res->fetch_assoc();
+    ?>
+    
+    <form action="editar.php" method="POST">
+        <input type="hidden" name="cedula_vieja" value="<?php echo $datos['cedula']; ?>">
+        Nombre: <input type="text" name="nuevo_nombre" value="<?php echo $datos['nombre']; ?>"><br>
+        <button type="submit">Actualizar</button>
+    </form>
+
+    <?php
+}
+
+// PARTE 2: ACTUALIZAR DATOS
+if (isset($_POST['nuevo_nombre'])) {
+    $cedula_vieja = $_POST['cedula_vieja'];
+    $nuevo_nombre = $_POST['nuevo_nombre'];
+
+    $sql_update = "UPDATE clientes SET nombre = '$nuevo_nombre' WHERE cedula = '$cedula_vieja'";
+    
+    // CAMBIO AQUÍ
+    $conn->query($sql_update);
+
+    header("Location: index.php");
+}
+?>
