@@ -1,0 +1,216 @@
+conexion
+
+<?php
+
+$hostname = "localhost";
+$user = "root";
+$pass = "";
+$db = "sistema_pedidos";
+
+$conn = mysqli_connect($hostname,$user,$pass,$db);
+
+if(!$conn){
+    echo "error".mysqli_connect_error();
+}
+
+
+?>
+-------------------------------------------------
+<?php require_once "conexion.php"; ?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Clientes y Pedidos</title>
+</head>
+<body>
+
+    <!-- 1. FORMULARIO INSERTAR CLIENTE -->
+    <h2>1. Registrar Cliente</h2>
+    <form method="POST" action="insert_cliente.php">
+        Cédula: <input type="text" name="ced_cli" minlength="10" maxlength="10" required><br><br>
+        Apellido: <input type="text" name="ape_cli" required><br><br>
+        Nombre: <input type="text" name="nom_cli" required><br><br>
+        Teléfono: <input type="text" name="tel_cli" required><br><br>
+        <input type="submit" value="Guardar Cliente">
+    </form>
+
+    <hr>
+
+    <!-- 2. FORMULARIO INSERTAR PEDIDO -->
+    <h2>2. Registrar Pedido</h2>
+    <form method="POST" action="insert_pedido.php">
+        Cliente:
+        <select name="ced_cli" required>
+            <option value="">Seleccione un cliente</option>
+            <?php
+            $res = mysqli_query($conn, "SELECT * FROM clientes");
+            while ($f = mysqli_fetch_assoc($res)) {
+                echo "<option value='" . $f['ced_cli'] . "'>" . $f['ape_cli'] . " " . $f['nom_cli'] . "</option>";
+            }
+            ?>
+        </select><br><br>
+
+        Producto:
+        <select name="id_pro" required>
+            <option value="">Seleccione un producto</option>
+            <?php
+            $res = mysqli_query($conn, "SELECT * FROM productos");
+            while ($f = mysqli_fetch_assoc($res)) {
+                echo "<option value='" . $f['id_pro'] . "'>" . $f['nom_pro'] . " ($" . $f['prec_pro'] . ")</option>";
+            }
+            ?>
+        </select><br><br>
+
+        Cantidad: <input type="number" name="cant_sol" min="1" required><br><br>
+        Fecha: <input type="date" name="fec_rea" required><br><br>
+        <input type="submit" value="Guardar Pedido">
+    </form>
+
+    <hr>
+
+    <!-- 3. BUSCAR PEDIDOS POR CÉDULA DEL CLIENTE -->
+    <h2>3. Consultar Pedidos por Cédula</h2>
+    <form method="POST" action="index.php">
+        Cédula del cliente:
+        <input type="text" name="buscar_ced" placeholder="Ingrese cédula...">
+        <input type="submit" value="Buscar">
+        <a href="index.php"><button type="button">Ver Todos</button></a>
+    </form>
+    <br>
+
+    <!-- TABLA DE PEDIDOS (TRIPLE JOIN) -->
+    <table border="1">
+        <tr>
+            <th>Cédula</th>
+            <th>Cliente</th>
+            <th>Producto</th>
+            <th>Cantidad</th>
+            <th>Precio Unit.</th>
+            <th>Total</th>
+            <th>Fecha</th>
+        </tr>
+        <?php
+        $sql = "SELECT c.ced_cli, c.ape_cli, c.nom_cli, p.nom_pro, d.cant_sol, p.prec_pro, 
+                       (d.cant_sol * p.prec_pro) AS total, d.fec_rea
+                FROM clientes c, productos p, pedidos d
+                WHERE d.ced_cli = c.ced_cli
+                  AND d.id_pro = p.id_pro";
+
+        // Si el usuario buscó una cédula, agregamos el filtro al Triple JOIN
+        if (!empty($_POST['buscar_ced'])) {
+            $b = $_POST['buscar_ced'];
+            $sql .= " AND c.ced_cli LIKE '%$b%'";
+        }
+
+        $res = mysqli_query($conn, $sql);
+
+        if (mysqli_num_rows($res) > 0) {
+            while ($f = mysqli_fetch_assoc($res)) {
+                echo "<tr>";
+                echo "<td>" . $f['ced_cli'] . "</td>";
+                echo "<td>" . $f['ape_cli'] . " " . $f['nom_cli'] . "</td>";
+                echo "<td>" . $f['nom_pro'] . "</td>";
+                echo "<td>" . $f['cant_sol'] . "</td>";
+                echo "<td>$" . $f['prec_pro'] . "</td>";
+                echo "<td>$" . $f['total'] . "</td>";
+                echo "<td>" . $f['fec_rea'] . "</td>";
+                echo "</tr>";
+            }
+        } else {
+            echo "<tr><td colspan='7'>No se encontraron pedidos para esa cédula</td></tr>";
+        }
+        ?>
+    </table>
+    <a href="reporte.php" target="_blank"><button type="button">Generar Reporte PDF</button></a>
+
+</body>
+</html>
+--------------------------------------------------------------------
+insert_cliente
+
+<?php
+require_once "conexion.php";
+
+$ced_cli = $_POST['ced_cli'];
+$ape_cli = $_POST['ape_cli'];
+$nom_cli = $_POST['nom_cli'];
+$tel_cli = $_POST['tel_cli'];
+
+
+$sql = "INSERT INTO clientes (ced_cli, ape_cli, nom_cli, tel_cli) 
+        VALUES ('$ced_cli', '$ape_cli', '$nom_cli', '$tel_cli')";
+
+if (mysqli_query($conn, $sql)) {
+    header("Location: index.php");
+} else {
+    echo "Error al registrar cliente: " . mysqli_error($conn);
+}
+?>  
+
+-----------------------------------------------------------------
+insert_pedido
+
+
+<?php
+require_once "conexion.php";
+
+$ced_cli  = $_POST['ced_cli'];
+$id_pro   = $_POST['id_pro'];
+$cant_sol = $_POST['cant_sol'];
+$fec_rea  = $_POST['fec_rea'];
+
+if (empty($ced_cli) || empty($id_pro) || $cant_sol <= 0) {
+    echo "<script>
+            alert('Error: Seleccione cliente, producto y una cantidad mayor a 0');
+            window.location.href = 'index.php';
+          </script>";
+    exit();
+}
+
+$sql = "INSERT INTO pedidos (ced_cli, id_pro, cant_sol, fec_rea) 
+        VALUES ('$ced_cli', '$id_pro', '$cant_sol', '$fec_rea')";
+
+if (mysqli_query($conn, $sql)) {
+    header("Location: index.php");
+} else {
+    echo "Error al registrar pedido: " . mysqli_error($conn);
+}
+?>
+
+--------------------------------
+reporte.php
+<?php
+require_once "conexion.php";
+require("./fpdf19/fpdf.php"); 
+
+$pdf = new FPDF();
+$pdf->AddPage();
+$pdf->SetFont('Arial', 'B', 12);
+
+$pdf->Cell(180, 10, 'REPORTE GENERAL', 0, 1, 'C');
+$pdf->Ln(5);
+
+$pdf->Cell(60, 10, 'Cliente', 1, 0, 'C');
+$pdf->Cell(60, 10, 'Producto', 1, 0, 'C');
+$pdf->Cell(60, 10, 'Total', 1, 1, 'C'); 
+
+$pdf->SetFont('Arial', '', 10);
+$sql = "SELECT c.nom_cli, p.nom_pro, (d.cant_sol * p.prec_pro) AS total
+        FROM clientes c, productos p, pedidos d
+        WHERE d.ced_cli = c.ced_cli AND d.id_pro = p.id_pro";
+$res = mysqli_query($conn, $sql);
+
+while ($f = mysqli_fetch_assoc($res)) {
+    $pdf->Cell(60, 10, $f['nom_cli'], 1, 0);
+    $pdf->Cell(60, 10, $f['nom_pro'], 1, 0);
+    $pdf->Cell(60, 10, '$' . $f['total'], 1, 1); 
+}
+
+if (ob_get_length()) {
+    ob_end_clean();
+}
+$pdf->Output();
+?>
+
+
