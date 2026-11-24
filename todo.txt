@@ -213,4 +213,53 @@ if (ob_get_length()) {
 $pdf->Output();
 ?>
 
+--------------------------------------------
+con filtro
+<form method="POST" action="reporte.php" target="_blank">
+    Filtrar por cédula (vacío = todos):
+    <input type="text" name="filtro" placeholder="Ej: 0501234567">
+    <input type="submit" value="Generar Reporte PDF">
+</form>
+-------------------------------------------
+<?php
+require_once "conexion.php";
+require("./fpdf/fpdf.php");
+
+// 1. Recibes el filtro de forma segura
+$filtro = isset($_POST['filtro']) ? trim($_POST['filtro']) : '';
+
+$pdf = new FPDF();
+$pdf->AddPage();
+$pdf->SetFont('Arial', 'B', 12);
+
+$pdf->Cell(180, 10, 'REPORTE DE PEDIDOS', 0, 1, 'C');
+$pdf->Ln(5);
+
+$pdf->Cell(60, 10, 'Cliente', 1, 0, 'C');
+$pdf->Cell(60, 10, 'Producto', 1, 0, 'C');
+$pdf->Cell(60, 10, 'Total', 1, 1, 'C');
+
+$pdf->SetFont('Arial', '', 10);
+$sql = "SELECT c.nom_cli, p.nom_pro, (d.cant_sol * p.prec_pro) AS total
+        FROM clientes c, productos p, pedidos d
+        WHERE d.ced_cli = c.ced_cli AND d.id_pro = p.id_pro";
+
+// 2. Si escribieron algo, le pegas el AND al Triple JOIN
+if ($filtro != '') {
+    $sql .= " AND c.ced_cli LIKE '%$filtro%'";
+}
+
+$res = mysqli_query($conn, $sql);
+
+while ($f = mysqli_fetch_assoc($res)) {
+    $pdf->Cell(60, 10, $f['nom_cli'], 1, 0);
+    $pdf->Cell(60, 10, $f['nom_pro'], 1, 0);
+    $pdf->Cell(60, 10, '$' . $f['total'], 1, 1);
+}
+
+if (ob_get_length()) {
+    ob_end_clean();
+}
+$pdf->Output();
+?>
 
